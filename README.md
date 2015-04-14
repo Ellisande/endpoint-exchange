@@ -18,6 +18,12 @@ Consuming a new service will automatically update your endpoints.json file with 
 
 ```epm consume chat-service@1.0.0```
 
+### Consume APIs
+* -s <serviceName>
+* -v <version>
+* -sv <serviceName>@<version>
+* -t <tag>
+
 ## Refresh Endpoints
 
 ```epm refresh```
@@ -49,6 +55,13 @@ epm create chat-service -v 1.0.1
 
 epm create -s chat-service -v 1.0.1
 ```
+
+### Create APIS
+* -s <serviceName>
+* -v <version>
+* -sv <serviceName>@<version>
+* -auto_update [true|false]
+* -u <url>
 
 ## Update/Add a Service Endpoint
 
@@ -83,6 +96,13 @@ epm update -sv chat-service@1.0.0 -t system-test http://test.google.com
 #Multiple tags
 epm update -sv chat-service@1.0.0 -t system-test -t high-availability http://ha.google.com
 ```
+
+### Update APIs
+* -s <serviceName>
+* -v <version>
+* -sv <serviceName>@<version>
+* -t <tag>
+* -u <url>
 
 
 
