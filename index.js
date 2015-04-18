@@ -51,21 +51,22 @@ contracts = {
 }
 
 registry = [{
-  name: "chat-ui",
-  versions: [
-    {
-      version: "1.x",
-      depracted: true
-    },
-    {
-      version: "2.0.0",
-      beta: true
+    name: "chat-ui",
+    versions: [
+      {
+        version: "1.x",
+        depracted: true
+      },
+      {
+        version: "2.0.0",
+        beta: true
+      }
+    ],
+    options: {
+      allow_compatible: true,
+      minor_version_inherit: true
     }
-  ],
-  options: {
-    allow_compatible: true,
-    minor_version_inherit: true
-  }},
+  },
   {
     name: "epm",
     versions: [
