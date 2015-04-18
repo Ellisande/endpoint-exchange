@@ -2,7 +2,28 @@ var express = require('express');
 var app = express();
 var bodyParser = require('body-parser');
 var semver = require('semver');
+var mongo = require('mongodb');
+var db = require('monk')('localhost/registry');
+var registry = db.get('registry');
+var contracts = db.get('contract');
+var _ = require('lodash');
 app.use(bodyParser.json());
+
+var versionComapre = function(lhs, rhs){
+  return semver.rcompare(lhs.version, rhs.version);
+}
+
+var maxSatisfying = function(providedVersions, requestedVersion){
+  var extractedVersions = _.map(providedVersions, function(version){
+    return version.version;
+  });
+
+  var max = semver.maxSatisfying(extractedVersions, requestVersion);
+  var maxSatisfyingVersion = _.find(providedVersions, function(version){
+    return version.version == max;
+  });
+  return maxSatisfyingVersion;
+}
 
 function generateUUID(){
     var d = new Date().getTime();
@@ -29,52 +50,73 @@ contracts = {
   }
 }
 
-registry = {
-  "chat-ui": {
-    versions: {
-      '1.x': {depracted: true},
-      '2.0.0': {beta: true}
+registry = [{
+  name: "chat-ui",
+  versions: [
+    {
+      version: "1.x",
+      depracted: true
     },
-    options: {
-      allow_compatible: true,
-      minor_versions_inherit: true
+    {
+      version: "2.0.0",
+      beta: true
     }
+  ],
+  options: {
+    allow_compatible: true,
+    minor_version_inherit: true
+  }},
+  {
+    name: "epm",
+    versions: [
+      {
+        version: "1.x",
+        depracted: true
+      },
+      {
+        version: "2.0.0",
+        beta: true
+      }
+    ]
   },
-  "chat-service": {
-    versions: {
-      '1.0.0': {
+  {
+    name: "chat-service",
+    versions: [
+      {
+        version: "1.0.0",
         endpoints: {
           default: "http://www.chat-service.com/apis",
-          'system:x': 'http://beta.chat-service.com/apis'
+          "system:x": "http://beta.chat-service.com/apis"
         },
         depracted: true
       },
-      '1.0.1': {
+      {
+        version: "1.0.1",
         endpoints: {
-          default: 'http://new.chat-service.com/apis'
+          default: "http://new.chat-service.com/apis"
         }
       },
-      '2.0.0': {
+      {
+        version: "2.0.0",
         beta: true
       }
-    },
+    ],
     options: {
       auto_update_compatible: true
     }
   }
-};
+];
 
 app.post('/contract/add', function (req, res) {
   var consumer = req.body.consumer;
   var requestedProvider = req.body.provider;
-  if(registry[requestedProvider.name]){
-    var provider = registry[requestedProvider.name];
+  registry.findOne({name: requestedProvider.name}, function(err, provider){
     var providedVersions = Object.keys(provider.versions);
     var providedVersion;
     if(!requestedProvider.version){
-      providedVersion = providedVersions.sort(semver.rcompare)[0];
+      providedVersion = providedVersions.sort(versionCompare)[0];
     } else {
-      providedVersion = semver.maxSatisfying(providedVersions, requestedProvider.version);
+      providedVersion = maxSatisfying(providedVersions, requestedProvider.version);
     }
 
     if(!providedVersion){
@@ -85,17 +127,19 @@ app.post('/contract/add', function (req, res) {
     var newKey = generateUUID();
     contracts[newKey] = {
       api_key: newKey,
-      provider_name: provider.name,
-      provider_version: providedVersion,
+      provider_name: requestedProvider.name,
+      provider_version: providedVersion.version,
       consumer_name: consumer.name,
       consumer_version: consumer.version,
       required_tags: [],
-      endpoints: provider.versions[providedVersion].endpoints
+      endpoints: providedVersion.endpoints
     }
+  })
 
-  }
-
-  res.send(200);
+  var providerKey = contracts[newKey].provider_name + "-" + contracts[newKey].provider_version;
+  var returnObject = {};
+  returnObject[providerKey] = contracts[newKey];
+  res.status(200).send(returnObject);
 });
 
 app.get('/endpoint/update', function(req, res){
@@ -106,6 +150,21 @@ app.get('/endpoint/update', function(req, res){
   }
   return res.send(contract.endpoints);
 
+});
+
+app.get('/endpoint/lookup', function(req, res){
+  var apiKey = req.query['api-key'];
+  var tag = req.query.tag;
+  var contract = contracts[apiKey];
+  if(contract){
+    if(!tag){
+      return res.send(contract.endpoints.default);
+    }
+
+    return res.send(contract.endpoints[tag]);
+  }
+
+  res.status(400).send("No contracts matched the provided api key / tag combination");
 });
 
 app.post('/version/add', function(req, res){
