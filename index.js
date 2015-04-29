@@ -79,6 +79,7 @@ app.post('/contract/add', function (req, res) {
     contracts.insert(newContract);
     var providerKey = newContract.provider_name + "-" + newContract.provider_version;
     var returnObject = {};
+    delete(newContract._id);
     returnObject[providerKey] = newContract;
     return res.status(200).send(returnObject);
   })
@@ -89,7 +90,8 @@ app.post('/contract/remove', function(req, res){
   var providerVersion = req.body.provider.version || 'x.x.x';
   var consumerName = req.body.consumer.name;
   var consumerVersion = req.body.consumer.version || 'x.x.x';
-  var removedAtLeastOne = false;
+  var removedContracts = []
+  console.log({providerName: providerName, providerVersion: providerVersion, consumerName: consumerName, consumerVersion: consumerVersion});
   contracts.find({provider_name: providerName, consumer_name: consumerName}, function(err, results){
     for(x in results){
       var contract = results[x];
@@ -97,22 +99,35 @@ app.post('/contract/remove', function(req, res){
       var satisfiesProvider = semver.satisfies(contract.provider_version, providerVersion);
       if(satisfiesConsumer && satisfiesProvider){
         contracts.remove({_id: contract._id});
-        removedAtLeastOne = true;
+        removedContracts.push(results[x]);
       }
     }
-    if(removedAtLeastOne) return res.status(200).send("Contract(s) removed");
+    if(removedContracts.length > 0) return res.status(200).send(removedContracts);
     res.status(404).send("No contracts matched the provider criteria.");
   });
 });
 
-app.get('/endpoint/cache', function(req, res){
-  var consumerKey = req.query.api_key;
-  contracts.findOne({api_key: consumerKey}, function(err, contract){
-    if(err || !contract){
-      return res.status(404).send("A contract does not exist for " + consumerKey);
+app.post('/endpoint/cache', function(req, res){
+  var consumerVersion = req.body.version;
+  var consumerName = req.body.name;
+  if(!consumerVersion || !consumerName){
+    return res.status(400).send("You must provide a name and a version for the contracts you'd like to cache.");
+  }
+  contracts.find({
+      consumer_name: consumerName
+    }, function(err, contracts){
+    if(err || !contracts || contracts.length == 0){
+      return res.status(404).send("A contract does not exist for " + consumerName + '-' + consumerVersion);
     }
 
-    return res.send(contract.endpoints);
+    var results = [];
+    contracts.forEach(function(contract){
+      if(semver.satisfies(contract.consumer_version, consumerVersion)){
+        delete(contract._id);
+        results.push(contract);
+      }
+    });
+    return res.send(results);
   })
 
 });
