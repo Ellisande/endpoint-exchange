@@ -1,108 +1,121 @@
-# epm
-Endpoint Manager is a simple npm-style tool for managing service endpoints and lookups.
+# endpoint exchange
 
-# Installing
+endpoint exchange is a hostable application that provides endpoint registry services. The goal is to provide easy and intuitive apis in support of endpoint lookup services.
 
-(Not in npm yet, placeholder)
-```npm install -g epm```
+## apis
 
-#Usage
+Endpoint exchange apis are all REST based APIs. They expect JSON in and return JSON out of each operation. Each operation's documentation assumes you have it deployed to a context root of some kind.
 
-## Consume a Service
+### Add a contract
+Adds a contract between the consumer and the provider.
 
-```epm consume chat-service```
+Post: /contract/add
 
-Consuming a new service will automatically update your endpoints.json file with current endpoints for the service.
-
-### Consume a Specific Version of a Service
-
-```epm consume chat-service@1.0.0```
-
-### Consume APIs
-* -s [serviceName]
-* -v [version]
-* -sv [serviceName]@[version]
-* -t [tag]
-
-## Refresh Endpoints
-
-```epm refresh```
-
-Refreshing endpoints will grab the new endpoints from your current contract and update the endpoints.json file in your local workspace. 
-
-Note: this is just for local reference. Endpoints are updated instantly on the lookup method when a provider makes changes.
-
-## Provide a New Service
-
-```epm create```
-
-Running create will attempt to create a new registry entry based on your current {configuationJson}.json file.
-
-### Create a Specific Service Version
-
-```epm create -v 1.0.1```
-
-### Create a Specific Service And Version
-
-```bash
-epm create chat-service@1.0.1
-
-#or
-
-epm create chat-service -v 1.0.1
-
-#or 
-
-epm create -s chat-service -v 1.0.1
+Input:
+```js
+{
+    "consumer":{
+        "version": "1.0.0",
+        "name": "epm"
+    },
+    "provider":{
+        "version": "1.x",
+        "name": "chat-service"
+    }
+}
 ```
 
-### Create APIS
-* -s [serviceName]
-* -v [version]
-* -sv [serviceName]@[version]
-* -auto_update [true|false]
-* -u [url]
+* consumer.name: name of the consuming application
+* consumer.version: version of the consuming application. Accepts semver version wildcards.
+* provider.name: name of the providing application
+* provider.version: version of the providing application. Accepts semver version wildcards.
 
-## Update/Add a Service Endpoint
+Response:
+```js
+{
+  "chat-service-1.5.0":
+  {
+    "api_key": "78bc16d3-ddff-4e17-9c36-73da207e5a85",
+    "provider_name": "chat-service",
+    "provider_version": "1.5.0",
+    "consumer_name": "epm",
+    "consumer_version": "1.0.0"
+  }
+}
+```
+The response will contain an object with <provider.name>-<provider.version> as keys, each one containing the contract api keys.
 
-You can update a service endpoint by providing just a version and the new endpoint
+### Remove a contract
+Removes a contract between the consumer and the provider.
 
-```bash
-epm update http://www.google.com
+Post: /contract/remove
+
+Input:
+```js
+{
+    "consumer":{
+        "version": "1.0.0",
+        "name": "epm"
+    },
+    "provider":{
+        "version": "1.x",
+        "name": "chat-service"
+    }
+}
 ```
 
-This will attempt to pull the your service name and version from your {configurationJson}.json file.
+* consumer.name: name of the consuming application
+* consumer.version: version of the consuming application. Accepts semver version wildcards.
+* provider.name: name of the providing application
+* provider.version: version of the providing application. Accepts semver version wildcards.
 
-### Update/Add a Specific Service Version Default Endpoint
-
-```bash
-#Attempt to update your current service version 1.0.0 endpoint
-epm update -v 1.0.0 http://www.google.com
-
-#Attempt to update a specific service version 1.0.0 endpoint
-epm update -s chat-service -v 1.0.0 http://www.google.com
-
-#Attempt to update a specific service version 1.0.0 endpoint
-epm update -sv chat-service@1.0.0 http://www.google.com
+Response:
+```js
+[
+  {
+    "_id": "553d0ab90beb3c45e67dc177",
+    "api_key": "881abe58-4c4f-4112-bf26-feba63b4fcf3",
+    "provider_name": "chat-service",
+    "provider_version": "1.5.0",
+    "consumer_name": "epm",
+    "consumer_version": "1.0.0",
+    "endpoints": null
+  }
+]
 ```
 
-Depending on your service settings you may not be allowed to update endpoints that have active consumers.
+The response is a list of the contracts that were removed by the call.
 
-### Update/Add an Endpoint With Tags
+### Get contracts for an application
+This operation finds all contracts for the consumer.
 
-```bash
-epm update -sv chat-service@1.0.0 -t system-test http://test.google.com
+Post: /endpoints/cache
 
-#Multiple tags
-epm update -sv chat-service@1.0.0 -t system-test -t high-availability http://ha.google.com
+Input:
+```js
+{
+    "name":"epm",
+    "version": "1.0.0"
+}
 ```
 
-### Update APIs
-* -s [serviceName]
-* -v [version]
-* -sv [serviceName]@[version]
-* -t [tag]
-* -u [url]
+* name: name of the consumer to get the contracts for.
+* version: version of the consumer to find contracts. Accepts semver version wildcards.
 
-
-
+Response:
+```js
+[
+  {
+    "api_key": "c44965f1-fcf4-49f2-9526-47f541185de8",
+    "provider_name": "chat-service",
+    "provider_version": "2.0.0",
+    "consumer_name": "epm",
+    "consumer_version": "1.0.0",
+    "endpoints": {
+      "default": "http://default.chat.com",
+      "system:x": "http://system.chat.com"
+    }
+  }
+]
+```
+The response returns a list of all contracts for the provided name and version.
