@@ -20,6 +20,9 @@ var addContract = localRequire('apis/contract/add');
 var removeContract = localRequire('apis/contract/remove');
 var cacheEndpoints = localRequire('apis/endpoint/cache');
 var lookupEndpoint = localRequire('apis/endpoint/lookup');
+var updateEndpoints = localRequire('apis/endpoint/update');
+var createApplication = localRequire('apis/application/create');
+var addApplicationVersion = localRequire('apis/application/version');
 
 var findVersion = function(versionToMatch){
   return function(version){
@@ -73,76 +76,16 @@ app.get('/endpoint/lookup', function(req, res){
   lookupEndpoint.action(req, res);
 });
 
-app.post('/version/add', function(req, res){
-  var applicationToUpdate = req.body.application;
-  if(!applicationToUpdate.name){
-    throw "No name was provided. You must provide at least a name for the service to be increased";
-  }
-  registry.findOne({name: applicationToUpdate.name}, function(err, application){
-    if(!application){
-      return res.status(404).send(application.name + ' does not exist in the registry. Try adding it before attempting to update its version');
-    }
-
-    var currentVersion = semver.maxSatisfying(extractVersions(application.versions), "x.x.x");
-    var newVersion = applicationToUpdate.version || semver.inc(currentVersion, "minor");
-
-    var versionExists = _.find(application.versions, function(version){
-      return version.version == newVersion;
-    });
-    if(versionExists){
-      return res.status(400).send('Version ' + applicationToUpdate.version + ' already exists for ' + applicationToUpdate.name);
-    }
-
-    var versionObject = {
-      version: newVersion,
-      name: applicationToUpdate.name
-    }
-    registry.update({_id: application._id}, {$push: {versions: versionObject}});
-    application.versions.push(versionObject);
-    res.send(application);
-  })
+app.post('/application/version', function(req, res){
+  addApplicationVersion.action(req, res);
 });
 
-app.post('/application', function(req, res){
-  var newApplication = req.body;
-  registry.findOne({name: newApplication.name}, function(application){
-    if(application){
-      return res.status(400).send("An application named " + newApplication.name + " already exists.")
-    }
-
-    if(registryValidator(newApplication)){
-      registry.insert(newApplication);
-      return res.status(200).send(newApplication);
-    }
-
-    return res.status(400).send("The application you tried to create was not valid");
-  });
+app.post('/application/create', function(req, res){
+  createApplication.action(req, res);
 });
 
 app.post('/endpoint/update', function(req, res){
-  var provider_name = req.body.name;
-  var provider_version = req.body.version;
-  var endpointUpdates = req.body.endpoints || {default: req.body.endpoint};
-  registry.findOne({name: provider_name}, function(err, provider){
-    if(!provider || !provider.versions){
-      return res.status(404).send("Unable to locate a registry entry for " + provider_name);
-    }
-
-    var versions = provider.versions || [];
-    var version = _.find(versions, findVersion(provider_version))  || {version: provider_version};
-    if(!version.endpoints){
-      version.endpoints = {};
-    }
-    for(var x in endpointUpdates){
-      version.endpoints[x] = endpointUpdates[x];
-    }
-    var index = versions.indexOf(version);
-    registry.update({_id: provider._id},
-      {$set:
-        {versions: versions}
-      });
-    return res.status(200).send(provider);
-  });
+  updateEndpoints.action(req, res);
 });
 
 var server = app.listen(3000, function () {
