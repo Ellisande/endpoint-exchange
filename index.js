@@ -11,6 +11,16 @@ var _ = require('lodash');
 var ansyc = require('async');
 app.use(bodyParser.json());
 
+global.localRequire = function(moduleName){
+  return require(__dirname + "/" + moduleName);
+}
+
+//APIS
+var addContract = localRequire('apis/contract/add');
+var removeContract = localRequire('apis/contract/remove');
+var cacheEndpoints = localRequire('apis/endpoint/cache');
+var lookupEndpoint = localRequire('apis/endpoint/lookup');
+
 var findVersion = function(versionToMatch){
   return function(version){
     return versionToMatch == version.version;
@@ -48,105 +58,19 @@ function generateUUID(){
 };
 
 app.post('/contract/add', function (req, res) {
-  var consumer = req.body.consumer;
-  var requestedProvider = req.body.provider;
-
-  registry.findOne({name: requestedProvider.name}, function(err, provider){
-    if(err){
-      return res.status(400).send("An unexpected error occured.");
-    }
-    var providedVersions = provider.versions;
-    var providedVersion;
-    if(!requestedProvider.version){
-      providedVersion = providedVersions.sort(versionCompare)[0];
-    } else {
-      providedVersion = maxSatisfying(providedVersions, requestedProvider.version);
-    }
-
-    if(!providedVersion){
-      return res.status(404).send(requestedProvider.version + " does not match a version provided by " + requestedProvider.name);
-    }
-
-    var newKey = generateUUID();
-    var newContract = {
-      api_key: newKey,
-      provider_name: requestedProvider.name,
-      provider_version: providedVersion.version,
-      consumer_name: consumer.name,
-      consumer_version: consumer.version,
-      endpoints: providedVersion.endpoints
-    }
-    contracts.insert(newContract);
-    var providerKey = newContract.provider_name + "-" + newContract.provider_version;
-    var returnObject = {};
-    delete(newContract._id);
-    returnObject[providerKey] = newContract;
-    return res.status(200).send(returnObject);
-  })
+  addContract.action(req, res);
 });
 
 app.post('/contract/remove', function(req, res){
-  var providerName = req.body.provider.name;
-  var providerVersion = req.body.provider.version || 'x.x.x';
-  var consumerName = req.body.consumer.name;
-  var consumerVersion = req.body.consumer.version || 'x.x.x';
-  var removedContracts = []
-  console.log({providerName: providerName, providerVersion: providerVersion, consumerName: consumerName, consumerVersion: consumerVersion});
-  contracts.find({provider_name: providerName, consumer_name: consumerName}, function(err, results){
-    for(x in results){
-      var contract = results[x];
-      var satisfiesConsumer = semver.satisfies(contract.consumer_version, consumerVersion);
-      var satisfiesProvider = semver.satisfies(contract.provider_version, providerVersion);
-      if(satisfiesConsumer && satisfiesProvider){
-        contracts.remove({_id: contract._id});
-        removedContracts.push(results[x]);
-      }
-    }
-    if(removedContracts.length > 0) return res.status(200).send(removedContracts);
-    res.status(404).send("No contracts matched the provider criteria.");
-  });
+  removeContract.action(req, res);
 });
 
 app.post('/endpoint/cache', function(req, res){
-  var consumerVersion = req.body.version;
-  var consumerName = req.body.name;
-  if(!consumerVersion || !consumerName){
-    return res.status(400).send("You must provide a name and a version for the contracts you'd like to cache.");
-  }
-  contracts.find({
-      consumer_name: consumerName
-    }, function(err, contracts){
-    if(err || !contracts || contracts.length == 0){
-      return res.status(404).send("A contract does not exist for " + consumerName + '-' + consumerVersion);
-    }
-
-    var results = [];
-    contracts.forEach(function(contract){
-      if(semver.satisfies(contract.consumer_version, consumerVersion)){
-        delete(contract._id);
-        results.push(contract);
-      }
-    });
-    return res.send(results);
-  })
-
+  cacheEndpoints.action(req, res);
 });
 
 app.get('/endpoint/lookup', function(req, res){
-  var apiKey = req.query.api_key;
-  var tag = req.query.tag;
-  contracts.findOne({api_key: apiKey}, function(err, contract){
-    if(err || !contract || !contract.endpoints){
-      return res.status(404).send("No contracts matched the provided api key / tag combination");
-    }
-
-    if(!tag || !contract.endpoints[tag] ){
-      return res.send({endpoint: contract.endpoints.default});
-    }
-
-    return res.send({endpoint: contract.endpoints[tag]});
-
-  });
+  lookupEndpoint.action(req, res);
 });
 
 app.post('/version/add', function(req, res){
