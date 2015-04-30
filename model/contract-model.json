@@ -1,0 +1,28 @@
+{
+  "Contract": {
+    "id": "Contract",
+    "description": "A contract, described by an api key, between a consumer version and a provider version",
+    "properties": {
+      "consumer_version": {
+        "type": "string",
+        "description": "version of the consumer for this contract"
+      },
+      "consumer_name": {
+        "type": "string",
+        "description": "name of the consumer for this contract"
+      },
+      "provider_version": {
+        "type": "string",
+        "description": "version of the provider for this contract"
+      },
+      "provider_name": {
+        "type": "string",
+        "description": "name of the provider for this contract"
+      },
+      "api_key": {
+        "type": "string",
+        "description": "unique api key for this contract"
+      }
+    }
+  }
+}
