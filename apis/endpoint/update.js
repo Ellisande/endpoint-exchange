@@ -7,7 +7,12 @@ var spec = {}
 var updateEndpoints = function(req, res){
   var provider_name = req.body.name;
   var provider_version = req.body.version;
-  var endpointUpdates = req.body.endpoints || {default: req.body.endpoint};
+  var endpointUpdates = req.body.endpoints || function(){
+    var endpoint = {};
+    var tag = req.body.tag || 'default';
+    endpoint[tag] = req.body.endpoint;
+    return endpoint;
+  }();
   registry.findOne({name: provider_name}, function(err, provider){
     if(!provider || !provider.versions){
       return res.status(404).send("Unable to locate a registry entry for " + provider_name);
